@@ -18,7 +18,7 @@ from wbx import matte, normalize as norm_mod, rectify as rectify_mod, unmix as u
 from wbx.io import load_image, save_rgb
 from wbx.pipeline import Params, process_image, process_photo
 from wbx.sheet import build_sheet
-from wbx.stickers import find_quotes
+from wbx.stickers import find_quotes, summarize_color
 
 import synthetic as syn
 
@@ -52,7 +52,7 @@ def board():
 @pytest.fixture(scope="module")
 def extracted(board):
     photo, strokes = board
-    ink, alpha, quotes, labels, _ = run(photo)
+    ink, alpha, quotes, labels, _rect, _merge = run(photo)
     return photo, strokes, ink, alpha, quotes, labels
 
 
@@ -135,7 +135,7 @@ def test_specks_and_ghosts_are_removed():
         speck_region &= s.coverage <= 0.05
     assert speck_region.sum() > 100, "the speck fixture is invisible to the matte"
 
-    _ink, alpha_clean, _q, _l, _r = run(dirty)
+    _ink, alpha_clean, _q, _l, _r, _m = run(dirty)
     assert float((alpha_clean[ghost_region] > 0).mean()) < 0.02, "eraser ghost survived"
     assert float((alpha_clean[speck_region] > 0).mean()) < 0.02, "specks survived"
 
@@ -239,7 +239,7 @@ def test_rectify_finds_the_board_corners():
 def test_rectified_board_still_yields_every_quote():
     photo, strokes = syn.make_board()
     frame, _corners = syn.place_on_wall(photo, angle_deg=25.0)
-    _ink, _alpha, quotes, _labels, rectified = process_image(frame, Params())
+    _ink, _alpha, quotes, _labels, rectified, _merge = process_image(frame, Params())
     assert rectified
     assert len(quotes) == len(strokes)
 
@@ -277,3 +277,52 @@ def test_cli_extract_and_sheet(tmp_path, board):
     res = runner.invoke(app, ["sheet", str(out)])
     assert res.exit_code == 0, res.output
     assert (out / "sheet.png").exists()
+
+
+# --------------------------------------------------------------------------- real photos
+
+SAMPLES = Path(__file__).resolve().parent.parent / "samples"
+
+
+def sample(name: str) -> Path:
+    path = SAMPLES / name
+    if not path.exists():
+        pytest.skip(f"{name} not in samples/")
+    return path
+
+
+def test_bare_board_yields_nothing():
+    """The empty-board calibration shot: real glare and scuffs, zero stickers."""
+    img = load_image(sample("nomarker.jpeg"))
+    _ink, alpha, quotes, _labels, _rect, _merge = process_image(img, Params())
+    assert quotes == []
+    assert int((alpha > 0).sum()) == 0, "bare board left ink behind"
+
+
+def test_frame_filling_board_is_not_rectified():
+    """A board with no visible corners must not be warped to a hallucinated quad."""
+    for name in ("nomarker.jpeg", "exampletext.jpeg"):
+        img = load_image(sample(name))
+        out, corners = rectify_mod.rectify(img)
+        assert corners is None, f"{name}: invented a board quad"
+        assert out.shape == img.shape
+
+
+def test_real_handwriting_is_one_sticker():
+    """Letter gaps scale with the photo; a fixed 30px radius split this into five."""
+    img = load_image(sample("exampletext.jpeg"))
+    _ink, _alpha, quotes, _labels, _rect, merge_radius = process_image(img, Params())
+    assert len(quotes) == 1, f"'Hello' came out as {len(quotes)} stickers"
+    assert 40 <= merge_radius <= 120, f"auto merge radius {merge_radius}px looks wrong"
+
+
+def test_real_marker_colour_is_recovered():
+    """The teal marker must come back teal, not grey and not blue."""
+    img = load_image(sample("exampletext.jpeg"))
+    ink, alpha, quotes, labels, _rect, _merge = process_image(img, Params())
+    (label, x, y, w, h, _area) = quotes[0]
+    sub_a = alpha[y:y + h, x:x + w]
+    sub_ink = ink[y:y + h, x:x + w]
+    color, dom_hue = summarize_color(sub_ink, sub_a)
+    assert dom_hue is not None, "teal marker reported as achromatic"
+    assert 160.0 <= dom_hue <= 195.0, f"hue {dom_hue} is not teal"

@@ -75,7 +75,7 @@ Start from `--debug`, which writes `OUT/<photo>/debug/`: `01_rectified`,
 | --- | --- |
 | pale strokes missing | raise `--sat-weight` (default 0.7) |
 | board noise surviving | raise `--alpha-floor` (0.06) or `--min-area` (150) |
-| two quotes merged into one sticker | lower `--merge-radius` (30) |
+| two quotes merged into one sticker | lower `--merge-radius` |
 | one quote split into several stickers | raise `--merge-radius` |
 | stray marks exported as quotes | raise `--min-quote-area` (800) |
 | eraser ghosts surviving | raise `--ghost-max-alpha` (0.35) / `--ghost-max-sat` (0.10) |
@@ -83,6 +83,11 @@ Start from `--debug`, which writes `OUT/<photo>/debug/`: `01_rectified`,
 | strokes bleeding into `02_background` | `--bg-method close` (fat-marker fallback) |
 | board quad missed or wrong | `--corners x1,y1,...` or `--no-rectify` |
 | design wants punchier colour | `--boost-sat 0.3` (off by default, on purpose) |
+
+`--merge-radius` defaults to **5x the median stroke width measured in that
+photo**, not a fixed pixel count.  A fixed count cannot be right: the same board
+at 2MP and 12MP needs different numbers, as do a fine-tip and a chisel-tip
+marker.  The value actually used is recorded in each `manifest.json`.
 
 `--no-bleed` turns off the few-pixel extension of ink colour underneath fully
 transparent pixels.  Leave it on: it changes nothing a correct compositor draws,
@@ -106,6 +111,8 @@ instruction rather than a traceback when one is missing.
 uv run pytest
 ```
 
+Photos in `samples/` are used as regressions too, and skipped when absent.
+
 `tests/synthetic.py` generates a whiteboard photo in code -- lighting gradient,
 vignette, glare blob, six words in known ink colours at known coverage, sensor
 noise -- so the pipeline can be checked against ground truth without waiting for
@@ -114,11 +121,18 @@ degrees, stroke IoU, ghost and speck removal, that cleaning does not erode black
 text, one sticker per quote, no grey halos, and rectification of a board yawed
 25 degrees to within 3 px.  Keep it green through every tuning change.
 
+Against the real photos it asserts that the bare board yields zero stickers,
+that a board with no visible corners is left unrectified rather than warped to a
+guessed quad, that real handwriting comes out as one sticker, and that the teal
+marker comes back teal.
+
 ## Capture tips for shoot day
 
 This matters as much as the code.
 
 - Shoot straight on, board filling the frame, no flash, angled away from windows.
+  If the board fills the frame completely its corners are not visible, so the
+  tool skips rectification and says so -- that is correct, not a failure.
 - Fresh markers, chisel tip, write big.
 - Leave a hand-width gap between quotes -- sticker merging assumes gaps.
 - Wipe the board properly first.  Ghosts are removable, but clean is cleaner.

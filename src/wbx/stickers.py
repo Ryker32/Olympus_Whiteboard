@@ -13,6 +13,11 @@ from .io import save_rgba
 from .matte import chroma, hue
 
 
+STROKE_WIDTHS_PER_GAP = 5.0
+"""Strokes within this many stroke-widths of each other belong to one quote."""
+
+MERGE_RADIUS_BOUNDS = (15, 200)
+
 ACHROMATIC_CHROMA = 0.12
 """Core chroma below which a quote counts as achromatic and reports no hue."""
 
@@ -27,6 +32,29 @@ class Quote:
     area: int
     color: str
     dominant_hue: float | None
+
+
+def estimate_stroke_width(mask: np.ndarray) -> float:
+    """Median marker stroke width in pixels, via the distance transform."""
+    dist = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 5)
+    inside = dist[dist > 0]
+    if inside.size == 0:
+        return 0.0
+    return float(2.0 * np.median(inside))
+
+
+def auto_merge_radius(mask: np.ndarray) -> int:
+    """Pick a merge radius from the handwriting itself.
+
+    A fixed pixel radius cannot be right: the same board shot at 2MP and 12MP
+    needs different numbers, and so do a fine-tip and a chisel-tip marker.  What
+    is stable is the gap between letters measured in stroke widths, so the
+    radius is derived from the median stroke width in this photo.
+    """
+    width = estimate_stroke_width(mask)
+    if width <= 0:
+        return MERGE_RADIUS_BOUNDS[0]
+    return int(np.clip(round(STROKE_WIDTHS_PER_GAP * width), *MERGE_RADIUS_BOUNDS))
 
 
 def _label_bboxes(labels: np.ndarray, n: int, mask: np.ndarray):
@@ -49,7 +77,7 @@ def _label_bboxes(labels: np.ndarray, n: int, mask: np.ndarray):
 
 def find_quotes(
     alpha: np.ndarray,
-    merge_radius: int = 30,
+    merge_radius: int | None = None,
     min_quote_area: int = 800,
     pad: int = 12,
 ):
@@ -61,14 +89,17 @@ def find_quotes(
     dropped decision uses the *undilated* stroke area, so a lone speck that
     dilation inflated into a large blob still fails ``min_quote_area``.
 
-    Returns ``(quotes, labels, mask)`` where quotes are ``(label, x, y, w, h,
-    area)`` in reading order.
+    ``merge_radius`` of None means derive it from the stroke width in this
+    photo -- see :func:`auto_merge_radius`.
+
+    Returns ``(quotes, labels, mask, merge_radius)`` where quotes are
+    ``(label, x, y, w, h, area)`` in reading order.
     """
     mask = alpha > 0
     if not mask.any():
-        return [], np.zeros(alpha.shape, np.int32), mask
+        return [], np.zeros(alpha.shape, np.int32), mask, int(merge_radius or 0)
 
-    r = max(0, int(merge_radius))
+    r = auto_merge_radius(mask) if merge_radius is None else max(0, int(merge_radius))
     if r > 0:
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
         dil = cv2.dilate(mask.astype(np.uint8), kernel)
@@ -90,7 +121,7 @@ def find_quotes(
         out.append((k, ax0, ay0, ax1 - ax0, ay1 - ay0, int(area[k])))
 
     out.sort(key=lambda q: (q[2], q[1]))  # reading order: top to bottom, then left to right
-    return out, labels, mask
+    return out, labels, mask, r
 
 
 def bleed_color(ink: np.ndarray, alpha: np.ndarray, iterations: int = 3) -> np.ndarray:

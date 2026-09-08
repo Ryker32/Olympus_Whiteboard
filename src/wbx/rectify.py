@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 
 MIN_AREA_FRACTION = 0.40
+MIN_EDGE_CONTRAST = 0.06
+BORDER_TOL = 4.0
 
 
 def order_corners(pts: np.ndarray) -> np.ndarray:
@@ -19,16 +21,60 @@ def order_corners(pts: np.ndarray) -> np.ndarray:
     )
 
 
-def _is_image_border(quad: np.ndarray, shape: tuple[int, ...], tol: float = 2.0) -> bool:
-    """True if the quad is just the image rectangle.
+def _touches_frame_edge(quad: np.ndarray, shape: tuple[int, ...], tol: float = BORDER_TOL) -> bool:
+    """True if any corner sits on the edge of the photo.
 
-    The Otsu fallback happily returns the whole frame when there is no board in
-    it (a blank wall, a close-up).  Warping that is a no-op at best and a
-    misleading "rectified" flag at worst, so it is not a board.
+    A corner against the frame edge is not a corner we can see -- the board runs
+    off the picture -- so there is nothing to map it to and the quad is almost
+    always something else that happens to be bounded by the image border.  On a
+    board that fills the frame this correctly declines to rectify, which is fine:
+    a frame-filling board is already frontal enough to use as-is.
     """
     h, w = shape[:2]
-    rect = order_corners(np.array([[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]], np.float32))
-    return bool(np.abs(order_corners(quad) - rect).max() <= tol)
+    x, y = quad[:, 0], quad[:, 1]
+    return bool((x <= tol).any() or (y <= tol).any()
+                or (x >= w - 1 - tol).any() or (y >= h - 1 - tol).any())
+
+
+def _edge_contrast(gray: np.ndarray, quad: np.ndarray, offset: float = 8.0,
+                   samples: int = 64) -> float:
+    """Weakest brightness step across the four sides of the quad.
+
+    A board against a wall steps sharply on all four sides.  A boundary that the
+    Otsu fallback hallucinated between a glare patch and the rest of the board
+    does not step at all -- which is how a lighting artifact gets mistaken for a
+    board.
+    """
+    h, w = gray.shape[:2]
+    quad = np.asarray(quad, np.float32).reshape(4, 2)
+    centre = quad.mean(axis=0)
+    weakest = np.inf
+
+    for i in range(4):
+        a, b = quad[i], quad[(i + 1) % 4]
+        t = np.linspace(0.08, 0.92, samples)[:, None]
+        pts = a + (b - a) * t
+
+        edge = b - a
+        normal = np.array([-edge[1], edge[0]], np.float32)
+        norm = np.linalg.norm(normal)
+        if norm < 1e-6:
+            return 0.0
+        normal /= norm
+        if np.dot(centre - (a + b) / 2.0, normal) < 0:
+            normal = -normal  # point it inward
+
+        inner = pts + normal * offset
+        outer = pts - normal * offset
+        ok = ((outer[:, 0] >= 0) & (outer[:, 0] < w) & (outer[:, 1] >= 0) & (outer[:, 1] < h)
+              & (inner[:, 0] >= 0) & (inner[:, 0] < w) & (inner[:, 1] >= 0) & (inner[:, 1] < h))
+        if ok.sum() < samples // 4:
+            return 0.0
+        vi = gray[inner[ok, 1].astype(int), inner[ok, 0].astype(int)]
+        vo = gray[outer[ok, 1].astype(int), outer[ok, 0].astype(int)]
+        weakest = min(weakest, float(abs(np.median(vi) - np.median(vo))))
+
+    return 0.0 if not np.isfinite(weakest) else weakest
 
 
 def _quads_from_edges(edges: np.ndarray, frame_area: float) -> list[np.ndarray]:
@@ -44,7 +90,7 @@ def _quads_from_edges(edges: np.ndarray, frame_area: float) -> list[np.ndarray]:
         if cv2.contourArea(approx) < MIN_AREA_FRACTION * frame_area:
             continue
         found.append(approx.reshape(4, 2).astype(np.float32))
-    found = [q for q in found if not _is_image_border(q, edges.shape)]
+    found = [q for q in found if not _touches_frame_edge(q, edges.shape)]
     return found
 
 
@@ -65,6 +111,9 @@ def find_board_quad(img: np.ndarray) -> np.ndarray | None:
         _, otsu = cv2.threshold(g8, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         otsu = cv2.morphologyEx(otsu, cv2.MORPH_CLOSE, np.ones((9, 9), np.uint8))
         candidates = _quads_from_edges(otsu, frame_area)
+
+    gray01 = gray if gray.max() <= 1.0 else gray / 255.0
+    candidates = [q for q in candidates if _edge_contrast(gray01, q) >= MIN_EDGE_CONTRAST]
     if not candidates:
         return None
 

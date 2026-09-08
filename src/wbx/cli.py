@@ -28,7 +28,8 @@ def extract(
     sat_weight: float = typer.Option(0.7, help="Weight of the saturation cue; catches yellow and pastels."),
     min_area: int = typer.Option(150, help="Drop connected components smaller than this (px)."),
     min_quote_area: int = typer.Option(800, help="Minimum stroke area for a merged blob to count as a quote."),
-    merge_radius: int = typer.Option(30, help="Dilation radius used to join strokes into one quote (px)."),
+    merge_radius: Optional[int] = typer.Option(
+        None, help="Dilation radius joining strokes into one quote (px). Default: 5x the stroke width."),
     boost_sat: float = typer.Option(0.0, help="Punch up recovered saturation. Off by default, on purpose."),
     ghost_max_alpha: float = typer.Option(0.35, help="Eraser-ghost test: peak alpha below this..."),
     ghost_max_sat: float = typer.Option(0.10, help="...and mean saturation below this, means ghost."),

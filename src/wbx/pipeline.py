@@ -19,7 +19,7 @@ class Params:
     sat_weight: float = 0.7
     min_area: int = 150
     min_quote_area: int = 800
-    merge_radius: int = 30
+    merge_radius: int | None = None  # None = derive from stroke width
     boost_sat: float = 0.0
     ghost_max_alpha: float = 0.35
     ghost_max_sat: float = 0.10
@@ -131,7 +131,7 @@ def process_image(
     if debug_dir:
         save_rgb(debug_dir / "05_ink.png", ink)
 
-    quotes, labels, _mask = stickers.find_quotes(
+    quotes, labels, _mask, merge_radius = stickers.find_quotes(
         alpha,
         merge_radius=p.merge_radius,
         min_quote_area=p.min_quote_area,
@@ -140,7 +140,7 @@ def process_image(
     if debug_dir:
         save_rgb(debug_dir / "06_components_overlay.png", _overlay(alpha, quotes, labels))
 
-    return ink, alpha, quotes, labels, rectified
+    return ink, alpha, quotes, labels, rectified, merge_radius
 
 
 def process_photo(path: Path, out_root: Path, p: Params, debug: bool = False) -> Result:
@@ -154,7 +154,11 @@ def process_photo(path: Path, out_root: Path, p: Params, debug: bool = False) ->
 
     warnings: list[str] = []
     img = load_image(path)
-    ink, alpha, quotes, labels, rectified = process_image(img, p, debug_dir, warnings)
+    ink, alpha, quotes, labels, rectified, merge_radius = process_image(
+        img, p, debug_dir, warnings
+    )
+    params = p.public()
+    params["merge_radius"] = merge_radius  # record what was actually used
 
     manifest = stickers.export(
         out_dir,
@@ -164,7 +168,7 @@ def process_photo(path: Path, out_root: Path, p: Params, debug: bool = False) ->
         quotes=quotes,
         labels=labels,
         rectified=rectified,
-        params=p.public(),
+        params=params,
         bleed=p.bleed,
     )
     return Result(path, out_dir, manifest, rectified, warnings)
