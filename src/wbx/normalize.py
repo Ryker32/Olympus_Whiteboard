@@ -13,6 +13,10 @@ import cv2
 import numpy as np
 
 
+INPAINT_RADIUS = 3
+"""Pixels of surrounding board an inpainted gap is continued from, at work size."""
+
+
 def _work_size(shape: tuple[int, ...], work_max: int) -> tuple[int, int]:
     h, w = shape[:2]
     scale = min(1.0, work_max / float(max(h, w)))
@@ -36,21 +40,27 @@ def estimate_background(
     where strokes start bleeding into the median; a morphological close wipes
     dark structure first, then a wide Gaussian smooths what is left.
 
-    ``exclude`` is an optional boolean mask (True = do not sample here, e.g.
-    people in the frame); those pixels are filled with the median of the rest
-    before blurring so they cannot drag the estimate down.
+    ``exclude`` is an optional boolean mask (True = do not sample here): people
+    in the frame, the cleared surround of a hand-cropped quote, or the ink from
+    a first pass.  Those pixels are inpainted from their surroundings before
+    blurring, so they cannot drag the estimate down.
+
+    Inpainting rather than filling them with one number: a flat fill is only
+    harmless for a mask small enough that the blur washes it out.  Handed a
+    whole board's writing it *is* the estimate over a large area, the board
+    there no longer normalizes to 1.0, and the difference mattes as ink --
+    which on a bare board with a little glare is enough to invent a quote out
+    of nothing.  Continuing the surrounding lighting into the gap keeps the
+    estimate smooth across it.
     """
     w, h = _work_size(img.shape, work_max)
     small = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
+    u8 = np.clip(small * 255.0 + 0.5, 0, 255).astype(np.uint8)
 
     if exclude is not None and exclude.any():
-        ex = cv2.resize(exclude.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST).astype(bool)
+        ex = cv2.resize(exclude.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
         if not ex.all():
-            fill = np.median(small[~ex], axis=0)
-            small = small.copy()
-            small[ex] = fill
-
-    u8 = np.clip(small * 255.0 + 0.5, 0, 255).astype(np.uint8)
+            u8 = cv2.inpaint(u8, ex, INPAINT_RADIUS, cv2.INPAINT_TELEA)
 
     if method == "median":
         k = int(median_k) | 1

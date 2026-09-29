@@ -104,6 +104,72 @@ def add_ghost(photo: np.ndarray, org: tuple[int, int] = (150, 490),
     return out, cov
 
 
+def add_fat_word(photo: np.ndarray, word: str = "BOLD", org: tuple[int, int] = (150, 480),
+                 rgb: tuple[int, int, int] = (30, 90, 200), peak: float = 0.85,
+                 scale: float = 3.0, grow: int = 3):
+    """A chisel-tip marker: strokes wide enough to poison their own background.
+
+    Width is set by dilating the glyphs rather than by ``putText``'s thickness
+    argument, which this OpenCV build ignores past a few pixels.  The default
+    ``grow`` puts the strokes at roughly 10px median / 18px peak width on the
+    1600px synthetic board, which is where the real photos sit and where a
+    41px median blur starts landing on ink instead of on board.
+
+    Returns ``(photo, coverage)``.
+    """
+    canvas = np.zeros(photo.shape[:2], dtype=np.uint8)
+    cv2.putText(canvas, word, org, cv2.FONT_HERSHEY_SIMPLEX, scale, 255, 8, cv2.LINE_AA)
+    if grow:
+        canvas = cv2.dilate(canvas, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * grow + 1,) * 2))
+    cov = np.clip(cv2.GaussianBlur(canvas.astype(np.float32) / 255.0, (0, 0), 1.6), 0, 1) * peak
+    ink = np.float32(rgb) / 255.0
+    out = np.clip(cov[..., None] * ink + (1 - cov[..., None]) * photo, 0, 1).astype(np.float32)
+    return np.ascontiguousarray(out), cov
+
+
+def close_up(subject: np.ndarray, intruders: list[tuple[np.ndarray, int, int]],
+             size: tuple[int, int] = (1600, 2200), seed: int = 0):
+    """One quote photographed on its own, with neighbours running off the edges.
+
+    What a board shot one message at a time actually looks like: the subject
+    centred and whole, and whatever was written beside it clipped by the frame.
+    ``subject`` and each intruder are ``(coverage, ink)`` pairs as produced by
+    :func:`word`; intruders carry their own top-left corner, which may be
+    negative or past the edge.  Returns ``(photo, (x, y))`` of the subject.
+    """
+    h, w = size
+    photo = cv2.resize(board_lighting(), (w, h), interpolation=cv2.INTER_LINEAR)
+
+    def paste(cov, ink, x, y):
+        ch, cw = cov.shape[:2]
+        x0, y0, x1, y1 = max(0, x), max(0, y), min(w, x + cw), min(h, y + ch)
+        if x1 <= x0 or y1 <= y0:
+            return
+        c = cov[y0 - y:y1 - y, x0 - x:x1 - x][..., None]
+        photo[y0:y1, x0:x1] = c * ink + (1 - c) * photo[y0:y1, x0:x1]
+
+    cov, ink = subject
+    sx, sy = (w - cov.shape[1]) // 2, (h - cov.shape[0]) // 2
+    paste(cov, ink, sx, sy)
+    for icov, ix, iy in intruders:
+        paste(icov[0], icov[1], ix, iy)
+
+    rng = np.random.default_rng(seed)
+    photo = photo + rng.normal(0.0, 1.5 / 255.0, photo.shape).astype(np.float32)
+    return np.ascontiguousarray(np.clip(photo, 0, 1).astype(np.float32)), (sx, sy)
+
+
+def word(text: str, rgb: tuple[int, int, int] = (30, 90, 200), peak: float = 0.85,
+         scale: float = 2.2, thickness: int = 7, pad: int = 30):
+    """A word on its own transparent canvas, as ``(coverage, ink)``."""
+    (tw, th), base = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+    canvas = np.zeros((th + base + 2 * pad, tw + 2 * pad), dtype=np.uint8)
+    cv2.putText(canvas, text, (pad, pad + th), cv2.FONT_HERSHEY_SIMPLEX, scale, 255,
+                thickness, cv2.LINE_AA)
+    cov = np.clip(cv2.GaussianBlur(canvas.astype(np.float32) / 255.0, (0, 0), 1.6), 0, 1) * peak
+    return cov, np.float32(rgb) / 255.0
+
+
 def project_corners(w: int = WIDTH, h: int = HEIGHT, angle_deg: float = 25.0,
                     focal: float = 2200.0, distance: float = 2600.0,
                     canvas: tuple[int, int] = (1250, 1800)) -> np.ndarray:
@@ -135,3 +201,44 @@ def place_on_wall(board: np.ndarray, angle_deg: float = 25.0,
 
     frame = warped * mask[..., None] + wall * (1 - mask[..., None])
     return np.ascontiguousarray(np.clip(frame, 0, 1).astype(np.float32)), corners
+
+
+def lasso_crop(photo: np.ndarray, box: tuple[int, int, int, int],
+               frame: float = 0.0, seed: int = 3):
+    """Cut one quote out of ``photo`` the way a lasso tool does.
+
+    The loop is hand-drawn, so it is irregular rather than rectangular, and the
+    pixels outside it are cleared to pure black under alpha 0 -- which is what
+    image editors write, and why an alpha-blind load sees a huge black blob.
+
+    ``frame`` paints a dark bar of that tone along the bottom inside the loop:
+    the board's own frame or the marker tray, which a loop drawn around a quote
+    near the edge of the board catches along with it.
+
+    Returns ``(rgb, alpha)`` ready for :func:`wbx.io.save_rgba`.
+    """
+    x0, y0, x1, y1 = box
+    sub = np.ascontiguousarray(photo[y0:y1, x0:x1]).copy()
+    h, w = sub.shape[:2]
+
+    rng = np.random.default_rng(seed)
+    wobble = 0.06 * min(h, w)
+    pts = []
+    for t in np.linspace(0.0, 1.0, 40, endpoint=False):  # once around the perimeter
+        edge = t * 4.0
+        side, u = int(edge), edge % 1.0
+        x, y = [(u * w, 0.0), (float(w), u * h), ((1 - u) * w, float(h)), (0.0, (1 - u) * h)][side]
+        inward = [(0.0, 1.0), (-1.0, 0.0), (0.0, -1.0), (1.0, 0.0)][side]
+        d = rng.uniform(0.2, 1.0) * wobble
+        pts.append((x + inward[0] * d, y + inward[1] * d))
+
+    mask = np.zeros((h, w), np.uint8)
+    cv2.fillPoly(mask, [np.round(pts).astype(np.int32)], 1)
+
+    if frame > 0:
+        band = max(2, int(round(frame * min(h, w))))
+        sub[h - band:] = 0.12  # the dark board frame, as solid as any stroke
+
+    alpha = mask.astype(np.float32)
+    sub[mask == 0] = 0.0  # editors clear the RGB under transparent pixels
+    return np.ascontiguousarray(sub), np.ascontiguousarray(alpha)

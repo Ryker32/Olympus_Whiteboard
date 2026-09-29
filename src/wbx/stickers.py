@@ -13,10 +13,10 @@ from .io import save_rgba
 from .matte import chroma, hue
 
 
-STROKE_WIDTHS_PER_GAP = 5.0
-"""Strokes within this many stroke-widths of each other belong to one quote."""
+TEXT_HEIGHT_SLACK = 0.7
+"""Merge slack as a fraction of letter height.  See :func:`auto_merge_radius`."""
 
-MERGE_RADIUS_BOUNDS = (15, 200)
+MERGE_RADIUS_BOUNDS = (10, 600)
 
 ACHROMATIC_CHROMA = 0.12
 """Core chroma below which a quote counts as achromatic and reports no hue."""
@@ -43,18 +43,67 @@ def estimate_stroke_width(mask: np.ndarray) -> float:
     return float(2.0 * np.median(inside))
 
 
-def auto_merge_radius(mask: np.ndarray) -> int:
-    """Pick a merge radius from the handwriting itself.
+def text_height(stats: np.ndarray, min_area: int) -> float:
+    """Letter height in pixels: the 75th percentile of component box heights.
 
-    A fixed pixel radius cannot be right: the same board shot at 2MP and 12MP
-    needs different numbers, and so do a fine-tip and a chisel-tip marker.  What
-    is stable is the gap between letters measured in stroke widths, so the
-    radius is derived from the median stroke width in this photo.
+    The median sits too low because most components are lowercase letters with
+    no ascender; the 75th percentile lands near the real line height without
+    being thrown by one tall bracket or a stray descender.
     """
-    width = estimate_stroke_width(mask)
-    if width <= 0:
+    heights = stats[1:, cv2.CC_STAT_HEIGHT]
+    areas = stats[1:, cv2.CC_STAT_AREA]
+    heights = heights[areas >= int(min_area)]
+    if heights.size == 0:
+        return 0.0
+    return float(np.percentile(heights, 75))
+
+
+def auto_merge_radius(stats: np.ndarray, min_area: int) -> int:
+    """Pick the merge slack from the handwriting itself.
+
+    Scaled to letter height, not stroke width and not a fixed pixel count.  A
+    fixed count cannot be right -- the same board at 2MP and 12MP needs
+    different numbers -- and stroke width turned out to be a poor proxy: across
+    real photos the slack actually needed ranged from 4.7 to 13.7 stroke widths,
+    because a fat marker writing small and a fine marker writing large have the
+    same stroke and completely different line spacing.  Letter height is what
+    the gap between lines of one quote actually scales with.
+    """
+    height = text_height(stats, min_area)
+    if height <= 0:
         return MERGE_RADIUS_BOUNDS[0]
-    return int(np.clip(round(STROKE_WIDTHS_PER_GAP * width), *MERGE_RADIUS_BOUNDS))
+    return int(np.clip(round(TEXT_HEIGHT_SLACK * height), *MERGE_RADIUS_BOUNDS))
+
+
+def _group_boxes(boxes: np.ndarray, slack: int) -> np.ndarray:
+    """Group boxes whose slack-inflated rectangles touch, transitively.
+
+    Replaces dilating the whole mask with a huge kernel.  Beyond being far
+    cheaper, it groups on the structure that actually defines a quote: the lines
+    of one quote interleave vertically (ascenders and descenders overlap) while
+    separate quotes are set apart in both axes.
+    """
+    n = len(boxes)
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    x0 = boxes[:, 0] - slack
+    y0 = boxes[:, 1] - slack
+    x1 = boxes[:, 0] + boxes[:, 2] + slack
+    y1 = boxes[:, 1] + boxes[:, 3] + slack
+    touch = (x0[:, None] <= x1[None, :]) & (x1[:, None] >= x0[None, :]) \
+        & (y0[:, None] <= y1[None, :]) & (y1[:, None] >= y0[None, :])
+
+    for i, j in np.argwhere(np.triu(touch, 1)):
+        ri, rj = find(int(i)), find(int(j))
+        if ri != rj:
+            parent[ri] = rj
+    return np.array([find(i) for i in range(n)], dtype=np.int64)
 
 
 def _label_bboxes(labels: np.ndarray, n: int, mask: np.ndarray):
@@ -80,48 +129,111 @@ def find_quotes(
     merge_radius: int | None = None,
     min_quote_area: int = 800,
     pad: int = 12,
+    min_area: int = 150,
+    single: bool = False,
 ):
     """Merge nearby strokes into quotes.
 
-    Dilating by ``merge_radius`` closes the gaps between the letters and words
-    of one quote so they land in a single component, while the hand-width gap
-    we ask writers to leave between quotes keeps neighbours apart.  The kept-or-
-    dropped decision uses the *undilated* stroke area, so a lone speck that
-    dilation inflated into a large blob still fails ``min_quote_area``.
+    Every stroke component's bounding box is inflated by ``merge_radius`` and
+    boxes that then touch are pooled into one quote, transitively.  That joins
+    the letters, words and *lines* of one quote -- the hand-width gap we ask
+    writers to leave between quotes is what keeps neighbours apart.  The
+    kept-or-dropped decision uses real stroke area, so a speck whose inflated
+    box is large still fails ``min_quote_area``.
 
-    ``merge_radius`` of None means derive it from the stroke width in this
+    ``merge_radius`` of None means derive it from the letter height in this
     photo -- see :func:`auto_merge_radius`.
 
+    ``single`` pools every stroke into one quote regardless of distance, for
+    input that has already been cropped to a single quote by hand.  Splitting
+    such a crop back up can only be wrong, and the gap that separates two
+    quotes on a board is exactly the gap a wide-set signature leaves.
+
     Returns ``(quotes, labels, mask, merge_radius)`` where quotes are
-    ``(label, x, y, w, h, area)`` in reading order.
+    ``(label, x, y, w, h, area)`` in reading order and ``labels`` maps each
+    pixel to its quote.
     """
     mask = alpha > 0
+    empty = np.zeros(alpha.shape, np.int32)
     if not mask.any():
-        return [], np.zeros(alpha.shape, np.int32), mask, int(merge_radius or 0)
+        return [], empty, mask, int(merge_radius or 0)
 
-    r = auto_merge_radius(mask) if merge_radius is None else max(0, int(merge_radius))
-    if r > 0:
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * r + 1, 2 * r + 1))
-        dil = cv2.dilate(mask.astype(np.uint8), kernel)
+    n, comp, stats, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
+    if n <= 1:
+        return [], empty, mask, int(merge_radius or 0)
+
+    if single:
+        r = 0
+    elif merge_radius is None:
+        r = auto_merge_radius(stats, min_area)
     else:
-        dil = mask.astype(np.uint8)
+        r = max(0, int(merge_radius))
 
-    n, labels = cv2.connectedComponents(dil, connectivity=8)
-    y0, x0, y1, x1, area = _label_bboxes(labels, n, mask)
+    boxes = stats[1:, [cv2.CC_STAT_LEFT, cv2.CC_STAT_TOP, cv2.CC_STAT_WIDTH, cv2.CC_STAT_HEIGHT]]
+    areas = stats[1:, cv2.CC_STAT_AREA]
+    groups = np.zeros(len(boxes), dtype=np.int64) if single else _group_boxes(boxes, r)
 
+    # component label -> quote label, 0 meaning "not part of any kept quote"
+    remap = np.zeros(n, dtype=np.int32)
     h, w = alpha.shape
     out = []
-    for k in range(1, n):
-        if area[k] < int(min_quote_area):
+    for gid in np.unique(groups):
+        members = np.flatnonzero(groups == gid)
+        area = int(areas[members].sum())
+        if area < int(min_quote_area):
             continue
-        ax0 = max(0, int(x0[k]) - pad)
-        ay0 = max(0, int(y0[k]) - pad)
-        ax1 = min(w, int(x1[k]) + 1 + pad)
-        ay1 = min(h, int(y1[k]) + 1 + pad)
-        out.append((k, ax0, ay0, ax1 - ax0, ay1 - ay0, int(area[k])))
+        bx, by = boxes[members, 0], boxes[members, 1]
+        bw, bh = boxes[members, 2], boxes[members, 3]
+        x0 = max(0, int(bx.min()) - pad)
+        y0 = max(0, int(by.min()) - pad)
+        x1 = min(w, int((bx + bw).max()) + pad)
+        y1 = min(h, int((by + bh).max()) + pad)
+        label = len(out) + 1
+        remap[members + 1] = label
+        out.append((label, x0, y0, x1 - x0, y1 - y0, area))
 
     out.sort(key=lambda q: (q[2], q[1]))  # reading order: top to bottom, then left to right
-    return out, labels, mask, r
+    order = {q[0]: i + 1 for i, q in enumerate(out)}
+    remap = np.array([order.get(int(v), 0) for v in remap], dtype=np.int32)
+    out = [(order[q[0]],) + q[1:] for q in out]
+    out.sort(key=lambda q: q[0])
+
+    return out, remap[comp], mask, r
+
+
+EDGE_MARGIN = 0.01
+"""Strokes within this fraction of the short side of the frame count as clipped."""
+
+
+def pick_main(quotes, labels: np.ndarray, shape, margin: float = EDGE_MARGIN):
+    """Keep the one quote a close-up is of, dropping the neighbours at the edges.
+
+    Photographing a board one message at a time still catches the corner of
+    whatever is written next to it, and those intruders are indistinguishable
+    from the subject by size or colour -- a neighbour's signature can outweigh a
+    short quote.  What separates them is the frame: the subject was centred and
+    photographed whole, the intruders run off the edge of the picture.
+
+    So quotes clipped by the frame are dropped, and the largest of what remains
+    is the subject.  If *everything* touches an edge -- a quote photographed
+    tight, filling the frame -- the rule has nothing to say and the largest
+    quote wins on area alone.
+
+    Returns ``(quotes, labels)`` renumbered so the kept quote is label 1.
+    """
+    if not quotes:
+        return quotes, labels
+
+    h, w = shape[:2]
+    tol = max(1.0, float(margin) * min(h, w))
+    framed = [q for q in quotes
+              if q[1] > tol and q[2] > tol and q[1] + q[3] < w - tol and q[2] + q[4] < h - tol]
+    best = max(framed or quotes, key=lambda q: q[5])
+
+    kept = (1,) + tuple(best[1:])
+    remap = np.zeros(int(labels.max()) + 1, dtype=np.int32)
+    remap[best[0]] = 1
+    return [kept], remap[labels]
 
 
 def bleed_color(ink: np.ndarray, alpha: np.ndarray, iterations: int = 3) -> np.ndarray:

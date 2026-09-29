@@ -10,13 +10,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pytest
 
 from wbx import clean as clean_mod
 from wbx import matte, normalize as norm_mod, rectify as rectify_mod, unmix as unmix_mod
-from wbx.io import load_image, save_rgb
-from wbx.pipeline import Params, process_image, process_photo
+from wbx.io import load_image, load_rgba, save_rgb, save_rgba
+from wbx.pipeline import Keep, Params, process_image, process_photo
+from wbx.album import build_album
+from wbx.recut import recut
 from wbx.sheet import build_sheet
 from wbx.stickers import find_quotes, summarize_color
 
@@ -326,3 +329,320 @@ def test_real_marker_colour_is_recovered():
     color, dom_hue = summarize_color(sub_ink, sub_a)
     assert dom_hue is not None, "teal marker reported as achromatic"
     assert 160.0 <= dom_hue <= 195.0, f"hue {dom_hue} is not teal"
+
+
+# --------------------------------------------------------------------------- pre-cropped input
+
+def _lassoed(tmp_path, photo, strokes, names, frame=0.0, pad=60, name="crop.png"):
+    """Save a lasso cut-out around the named words, and say where they were."""
+    want = [s for s in strokes if s.name in names]
+    ys, xs = np.nonzero(sum(s.coverage for s in want) > 0.1)
+    box = (max(0, int(xs.min()) - pad), max(0, int(ys.min()) - pad),
+           min(photo.shape[1], int(xs.max()) + pad), min(photo.shape[0], int(ys.max()) + pad))
+    rgb, alpha = syn.lasso_crop(photo, box, frame=frame)
+    src = tmp_path / name
+    save_rgba(src, rgb, alpha)
+    return src, box, want
+
+
+def test_crop_mask_is_read_back(tmp_path, board):
+    photo, strokes = board
+    src, box, _ = _lassoed(tmp_path, photo, strokes, {"black"})
+    rgb, crop = load_rgba(src)
+    assert crop is not None and not crop.all(), "lasso cut-out read back as fully opaque"
+    assert rgb.shape[:2] == crop.shape == (box[3] - box[1], box[2] - box[0])
+
+    plain = load_image(src)
+    assert plain[~crop].min() > 0.9, "transparency composited over black, not board white"
+
+
+def test_cleared_surround_is_not_ink(tmp_path, board):
+    """The black under the transparent pixels must not matte as a solid blob."""
+    photo, strokes = board
+    src, _box, want = _lassoed(tmp_path, photo, strokes, {"black"})
+    result = process_photo(src, tmp_path / "out", Params())
+
+    rgba = load_image_rgba(result.out_dir / "board.png")
+    alpha = rgba[..., 3]
+    _rgb, crop = load_rgba(src)
+    assert float(alpha[~crop].max()) == 0.0, "cleared surround came out opaque"
+
+    truth = int((want[0].coverage > 0.1).sum())
+    got = int((alpha > 0).sum())
+    assert 0.6 * truth < got < 1.6 * truth, f"ink area {got} vs {truth} written pixels"
+
+
+def test_one_sticker_per_crop(tmp_path, board):
+    """A lasso is the operator saying 'this is one quote'; never split it again."""
+    photo, strokes = board
+    src, box, want = _lassoed(tmp_path, photo, strokes, {"black", "yellow"})
+    result = process_photo(src, tmp_path / "out", Params())
+
+    assert len(result.manifest["quotes"]) == 1, "hand-cropped quote came out as several stickers"
+    assert result.rectified is False, "tried to find a board quad in a crop"
+
+    q = result.manifest["quotes"][0]
+    for s in want:  # the one sticker has to hold both words, not just the bigger
+        sub = s.coverage[box[1]:box[3], box[0]:box[2]][q["y"]:q["y"] + q["h"], q["x"]:q["x"] + q["w"]]
+        assert (sub > 0.1).sum() > 200, f"{s.name} missing from the sticker"
+
+
+def test_clipped_board_frame_is_dropped(tmp_path, board):
+    """The dark bar a lasso catches at the board edge is not part of the quote."""
+    photo, strokes = board
+    plain, _b, _w = _lassoed(tmp_path, photo, strokes, {"black"}, name="plain.png")
+    framed, _b2, _w2 = _lassoed(tmp_path, photo, strokes, {"black"}, frame=0.08, name="framed.png")
+
+    a = process_photo(plain, tmp_path / "out_plain", Params())
+    b = process_photo(framed, tmp_path / "out_framed", Params())
+    assert len(b.manifest["quotes"]) == 1
+
+    before = a.manifest["quotes"][0]["area"]
+    after = b.manifest["quotes"][0]["area"]
+    assert abs(after - before) < 0.05 * before, f"frame removal cost {before - after} px of writing"
+
+
+def test_single_quote_can_be_forced_off(tmp_path, board):
+    """The auto behaviour is a default, not a rule: a crop can hold two quotes."""
+    photo, strokes = board
+    src, _box, _want = _lassoed(tmp_path, photo, strokes, {"black", "yellow"})
+    result = process_photo(src, tmp_path / "out", Params(keep=Keep.ALL))
+    assert len(result.manifest["quotes"]) == 2
+
+
+# --------------------------------------------------------------------------- fat marker
+
+def _fat_core(cov):
+    """Deep inside the fat strokes, where the background estimate goes wrong."""
+    d = cv2.distanceTransform((cov > 0.5 * cov.max()).astype(np.uint8), cv2.DIST_L2, 5)
+    return d >= 6
+
+
+def test_fat_marker_comes_out_solid(board):
+    """A chisel-tip stroke must not export as an outline with a hole in it."""
+    photo, _strokes = board
+    photo, cov = syn.add_fat_word(photo)
+    core = _fat_core(cov)
+    assert core.sum() > 2000, "the test's own fat word is too thin to prove anything"
+
+    _ink, alpha, _q, _l, _r, _m = run(photo)
+    filled = float((alpha[core] > 0.5).mean())
+    assert filled > 0.97, f"{1 - filled:.0%} of the fat stroke came out hollow"
+
+
+def test_fat_marker_is_hollow_without_the_refit(board):
+    """Why the second background pass exists; keeps the test above honest."""
+    photo, _strokes = board
+    photo, cov = syn.add_fat_word(photo)
+    core = _fat_core(cov)
+
+    _ink, alpha, _q, _l, _r, _m = run(photo, bg_refine=False)
+    filled = float((alpha[core] > 0.5).mean())
+    assert filled < 0.75, "one pass now fills fat strokes; the refit may be redundant"
+
+
+def test_refit_does_not_invent_ink_on_a_bare_board():
+    """Excluding the first pass's ink must not leave a flat patch that mattes."""
+    photo = syn.board_lighting()
+    _ink, alpha, quotes, _l, _r, _m = run(photo)
+    assert quotes == []
+    assert float(alpha.mean()) < 0.001, "the refit manufactured ink out of lighting"
+
+
+# --------------------------------------------------------------------------- album
+
+def test_album_is_a_flat_folder_of_copies(tmp_path, board):
+    """Handover folder: every sticker, renamed, byte-identical, plus provenance."""
+    import csv
+
+    photo, strokes = board
+    src = tmp_path / "IMG_0042.png"
+    save_rgb(src, photo)
+    out = tmp_path / "out"
+    result = process_photo(src, out, Params(rectify=False))
+
+    dest = tmp_path / "album"
+    rows = build_album(out, dest)
+    assert len(rows) == len(strokes)
+
+    files = sorted(dest.glob("sticker_*.png"))
+    assert [f.name for f in files] == [f"sticker_{i:02d}.png" for i in range(1, len(strokes) + 1)]
+    originals = sorted(result.out_dir.glob("quote_*.png"))
+    for copy, original in zip(files, originals):
+        assert copy.read_bytes() == original.read_bytes(), f"{copy.name} was re-encoded"
+    assert not (dest / "board.png").exists(), "the whole-board render is not a sticker"
+
+    with (dest / "index.csv").open() as fh:
+        index = list(csv.DictReader(fh))
+    assert [r["sticker"] for r in index] == [f.name for f in files]
+    assert {r["source photo"] for r in index} == {"IMG_0042.png"}
+
+    assert build_sheet(dest).exists()  # the flat layout stays reviewable
+
+
+def test_album_flags_the_same_quote_cropped_twice(tmp_path, board):
+    """Lassoing one quote twice is the normal accident; say so, drop nothing."""
+    photo, strokes = board
+    out = tmp_path / "out"
+    for name in ("first", "second"):
+        src, _box, _want = _lassoed(tmp_path, photo, strokes, {"red"}, name=f"{name}.png")
+        process_photo(src, out, Params())
+
+    rows = build_album(out, tmp_path / "album")
+    assert len(rows) == 2, "a flagged duplicate must still be copied"
+    assert rows[1].looks_like == rows[0].file
+    assert rows[0].looks_like == "", "the first copy is the one to keep"
+
+
+def test_album_does_not_flag_different_quotes(tmp_path, board):
+    photo, strokes = board
+    out = tmp_path / "out"
+    src = tmp_path / "IMG_0043.png"
+    save_rgb(src, photo)
+    process_photo(src, out, Params(rectify=False))
+
+    rows = build_album(out, tmp_path / "album")
+    assert len(rows) == len(strokes)
+    assert [r.looks_like for r in rows] == [""] * len(rows), "distinct quotes flagged as copies"
+
+
+# --------------------------------------------------------------------------- close-ups
+
+def _subject_of(photo, **kw):
+    _ink, _a, quotes, _l, _r, _m = run(photo, **kw)
+    return quotes
+
+
+def test_close_up_keeps_the_subject_not_the_neighbours():
+    """One message per photo still catches the corner of the next one."""
+    H, W = 1600, 2200
+    subject = syn.word("THANKS", rgb=(30, 90, 200))
+
+    def half_off(text, rgb, edge, along):
+        """Place a word so half of it hangs off the named edge of the frame."""
+        w = syn.word(text, rgb=rgb)
+        ih, iw = w[0].shape[:2]
+        pos = {"left": (-iw // 2, along), "right": (W - iw // 2, along),
+               "top": (along, -ih // 2), "bottom": (along, H - ih // 2)}[edge]
+        return (w, pos[0], pos[1])
+
+    cases = [
+        [half_off("NEIGHBOUR LONG", (200, 40, 60), "right", 200)],
+        [half_off("LEFT", (40, 150, 80), "left", 180),
+         half_off("RIGHT", (140, 80, 190), "right", 1150)],
+        [half_off("ABOVE", (200, 40, 60), "top", 700)],
+        [half_off("BELOW WIDE", (40, 150, 80), "bottom", 150)],
+    ]
+    for i, intruders in enumerate(cases):
+        photo, (sx, sy) = syn.close_up(subject, intruders, size=(H, W))
+        found = _subject_of(photo, keep=Keep.ALL)
+        assert len(found) > 1, f"case {i}: the intruders did not even register"
+
+        kept = _subject_of(photo, keep=Keep.MAIN)
+        assert len(kept) == 1, f"case {i}: kept {len(kept)} quotes, want the subject only"
+        _label, x, y, _w, _h, _area = kept[0]
+        assert abs(x - sx) < 90 and abs(y - sy) < 90, \
+            f"case {i}: kept the quote at {(x, y)}, subject is at {(sx, sy)}"
+
+
+def test_close_up_with_nothing_clipped_keeps_the_largest():
+    """Rule has nothing to say when every quote is whole; fall back to size."""
+    subject = syn.word("THANKS SO MUCH", rgb=(30, 90, 200))
+    photo, (sx, sy) = syn.close_up(subject, [(syn.word("HI", rgb=(200, 40, 60)), 1700, 200)])
+    kept = _subject_of(photo, keep=Keep.MAIN)
+    assert len(kept) == 1
+    assert abs(kept[0][1] - sx) < 90 and abs(kept[0][2] - sy) < 90
+
+
+def test_keep_all_is_still_the_default_for_a_board_shot(board):
+    photo, strokes = board
+    assert len(_subject_of(photo)) == len(strokes)
+
+
+# --------------------------------------------------------------------------- recut
+
+def test_recut_finds_the_source_photo_and_gains_resolution(tmp_path, board):
+    """A screenshot-scale crop is located in the full photo and cut again from it."""
+    photo, strokes = board
+    original = tmp_path / "20260101_120000.jpg"
+    save_rgb(original, photo)
+
+    # a crop at a fraction of the photo's scale: what a screenshot of it is.  The
+    # real shoot came off the screen at about 1/2.2, which is the ratio to model.
+    src, box, want = _lassoed(tmp_path, photo, strokes, {"red", "green"}, name="lasso.png")
+    small = load_image_rgba(src)
+    shrunk = cv2.resize(small, None, fx=1 / 2.2, fy=1 / 2.2, interpolation=cv2.INTER_AREA)
+    crop = tmp_path / "crop.png"
+    save_rgba(crop, shrunk[..., :3], shrunk[..., 3])
+
+    dest = tmp_path / "recut"
+    (match,) = recut([crop], [original], dest)
+    assert match.photo is not None, f"no match (best {match.inliers} inliers)"
+    assert match.photo.name == original.name
+    assert match.written is not None and match.written.exists()
+    assert match.gain > 1.8, f"only gained {match.gain}x; the point is resolution"
+
+    rgb, mask = load_rgba(match.written)
+    assert mask is not None and not mask.all(), "re-cut lost the outline"
+    truth = sum(x.coverage for x in want)[box[1]:box[3], box[0]:box[2]]
+    assert mask.sum() > 0.5 * (truth > 0.1).sum()
+
+
+def test_recut_reports_a_crop_that_is_not_in_any_photo(tmp_path, board):
+    """A crop from a different shoot must be reported, never matched anyway."""
+    photo, strokes = board
+    original = tmp_path / "board.jpg"
+    save_rgb(original, photo)
+
+    other = syn.board_lighting()
+    other, _cov = syn.add_fat_word(other, word="ELSEWHERE", rgb=(200, 40, 60))
+    stranger = tmp_path / "stranger.png"
+    save_rgba(stranger, other, np.ones(other.shape[:2], np.float32))
+
+    (match,) = recut([stranger], [original], tmp_path / "recut")
+    assert match.photo is None and match.written is None
+
+
+# --------------------------------------------------------------------------- glare
+
+def test_pale_marker_survives_the_specular_test(board):
+    """Yellow is brighter than the board in red and green; only blue gives it away.
+
+    The glare rules ask whether a pixel is brighter than the board, and asking it
+    of the brightest channel throws yellow away entirely.  This is the guard.
+    """
+    photo, strokes = board
+    yellow = next(s for s in strokes if s.name == "yellow")
+    core = yellow.coverage > 0.6 * yellow.coverage.max()
+
+    _ink, alpha, _q, _l, _r, _m = run(photo)
+    kept = float((alpha[core] > 0).mean())
+    assert kept > 0.97, f"the glare rules deleted {1 - kept:.0%} of the yellow marker"
+
+
+def test_reflection_is_not_matted_as_ink(board):
+    """A highlight on a glossy board is light added, not ink; it must not matte."""
+    photo, _strokes = board
+    h, w = photo.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    blob = np.exp(-(((xx - 0.30 * w) ** 2 + (yy - 0.72 * h) ** 2) / (2 * (0.05 * w) ** 2)))
+    glared = np.clip(photo + 0.30 * blob[..., None], 0, 1).astype(np.float32)
+    spot = blob > 0.5
+
+    _ink, plain, _q, _l, _r, _m = run(photo)
+    _ink, after, _q, _l, _r, _m = run(glared)
+    assert float((plain[spot] > 0).mean()) < 0.02, "the fixture landed on existing ink"
+    assert float((after[spot] > 0).mean()) < 0.05, "the reflection came out as a sticker"
+
+
+def test_dense_colour_does_not_bleach_itself(board):
+    """A patch of solid colour must not drag its own background estimate into it."""
+    photo, strokes = board
+    red = next(s for s in strokes if s.name == "red")
+    core = red.coverage > 0.6 * red.coverage.max()
+
+    _ink, alpha, _q, _l, _r, _m = run(photo)
+    recovered = float(alpha[core].mean())
+    truth = float(red.coverage[core].mean())
+    assert recovered > 0.75 * truth, \
+        f"recovered {recovered:.2f} coverage where the truth is {truth:.2f}"

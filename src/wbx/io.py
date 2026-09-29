@@ -38,16 +38,54 @@ def _register_heif() -> None:
     _heif_registered = True
 
 
-def load_image(path: str | Path) -> np.ndarray:
-    """Load a photo as float32 RGB in [0, 1], EXIF rotation applied."""
+def load_rgba(path: str | Path) -> tuple[np.ndarray, np.ndarray | None]:
+    """Load a photo as float32 RGB in [0, 1] plus its crop mask.
+
+    The mask is ``None`` for an ordinary opaque photo.  It is a boolean array
+    when the input is a *pre-cropped* quote: someone lassoed one quote out of a
+    board photo and saved it with transparency, so the file carries both the
+    pixels and which of them are real board.
+
+    That mask cannot be thrown away.  Editors clear the RGB under transparent
+    pixels to pure black, which is 20-40% of a typical lasso crop, so an
+    alpha-blind load hands the pipeline a huge black blob: the background
+    estimate is dragged dark and the blob mattes as solid ink.  Partially
+    transparent pixels along the lasso edge keep their real colour (the alpha
+    is straight, not premultiplied), but they still sit on the boundary, so
+    only fully opaque pixels count as board.
+    """
     path = Path(path)
     if path.suffix.lower() in HEIC_SUFFIXES:
         _register_heif()
     with Image.open(path) as im:
         im = ImageOps.exif_transpose(im)
-        im = im.convert("RGB")
+        has_alpha = im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info
+        im = im.convert("RGBA")
         arr = np.asarray(im, dtype=np.float32) / 255.0
-    return np.ascontiguousarray(arr)
+
+    rgb = np.ascontiguousarray(arr[..., :3])
+    if not has_alpha:
+        return rgb, None
+    crop = arr[..., 3] >= 1.0
+    if crop.all():
+        return rgb, None
+    return rgb, np.ascontiguousarray(crop)
+
+
+def load_image(path: str | Path) -> np.ndarray:
+    """Load a photo as float32 RGB in [0, 1], EXIF rotation applied.
+
+    Any transparency is composited over white -- the colour of bare board --
+    rather than dropped, which would leave black where the pixels were cleared.
+    Callers that need to know which pixels were transparent want
+    :func:`load_rgba` instead.
+    """
+    rgb, crop = load_rgba(path)
+    if crop is None:
+        return rgb
+    out = rgb.copy()
+    out[~crop] = 1.0
+    return out
 
 
 def _u8(a: np.ndarray) -> np.ndarray:

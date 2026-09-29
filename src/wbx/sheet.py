@@ -20,6 +20,7 @@ LABEL_H = 22
 COLUMNS = 3
 GAP = 10
 CHECK = 16
+SHEET_NAME = "sheet.png"
 
 
 def checkerboard(h: int, w: int, a: float, b: float) -> np.ndarray:
@@ -50,9 +51,15 @@ def _tile(rgba: np.ndarray, light: bool) -> np.ndarray:
 
 
 def find_stickers(out_dir: Path) -> list[Path]:
-    """All quote PNGs under OUT, including per-photo subdirectories."""
+    """All sticker PNGs under OUT, including per-photo subdirectories.
+
+    Covers both layouts: the per-photo ``quote_NN.png`` that ``extract`` writes,
+    and the flat, renamed folder that ``album`` hands over -- which is worth
+    being able to review as a sheet before it is sent.
+    """
     files = sorted(out_dir.glob("quote_*.png")) + sorted(out_dir.glob("*/quote_*.png"))
-    return files
+    # a sheet written into the folder it describes must not become a tile in the next one
+    return files or [f for f in sorted(out_dir.glob("*.png")) if f.name != SHEET_NAME]
 
 
 def build_sheet(out_dir: Path, dest: Path | None = None) -> Path:
@@ -92,6 +99,6 @@ def build_sheet(out_dir: Path, dest: Path | None = None) -> Path:
     for text, tx, ty in labels:
         cv2.putText(u8, text, (tx, ty), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
 
-    dest = Path(dest) if dest else out_dir / "sheet.png"
+    dest = Path(dest) if dest else out_dir / SHEET_NAME
     save_rgb(dest, u8.astype(np.float32) / 255.0)
     return dest
