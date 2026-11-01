@@ -16,9 +16,7 @@ Quotes already cut out of the photos by hand work too, transparency and all:
 uv run wbx extract crops/*.png -o out
 ```
 
-Crops made by hand are usually screenshots, so the segmentation is good and the
-pixels are not.  Both can be had -- find each crop in the photo it came from and
-cut it again at the camera's resolution:
+I used Screen Snip to lasso crop a bunch of the quotes so sometimes the segmentations were great, but the pixels suffered greatly.
 
 ```bash
 uv run wbx recut crops/*.png -p photos -o recut
