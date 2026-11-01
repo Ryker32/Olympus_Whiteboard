@@ -1,0 +1,385 @@
+{
+  "n_crops": 59,
+  "n_matched": 56,
+  "best_min_median_max": [
+    67,
+    194,
+    584
+  ],
+  "runner_up_max": 308,
+  "runner_up_median": 105,
+  "min_ratio_best_over_second": 1.03,
+  "crops_where_runner_up_ge_25": [
+    {
+      "crop": "Screenshot 2026-09-26 010415.png",
+      "best": 161,
+      "best_photo": "20260925_113938.jpg",
+      "second": 61,
+      "second_photo": "20260925_113834.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010428.png",
+      "best": 168,
+      "best_photo": "20260925_113938.jpg",
+      "second": 47,
+      "second_photo": "20260925_113834.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010433.png",
+      "best": 168,
+      "best_photo": "20260925_113938.jpg",
+      "second": 53,
+      "second_photo": "20260925_113834.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010446.png",
+      "best": 266,
+      "best_photo": "20260925_114028.jpg",
+      "second": 118,
+      "second_photo": "20260925_114017.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010457.png",
+      "best": 418,
+      "best_photo": "20260925_114041.jpg",
+      "second": 29,
+      "second_photo": "20260925_114038.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010508.png",
+      "best": 418,
+      "best_photo": "20260925_113754.jpg",
+      "second": 308,
+      "second_photo": "20260925_113831.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010515.png",
+      "best": 263,
+      "best_photo": "20260925_113754.jpg",
+      "second": 119,
+      "second_photo": "20260925_113945.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010521.png",
+      "best": 107,
+      "best_photo": "20260925_113754.jpg",
+      "second": 55,
+      "second_photo": "20260925_113831.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010528.png",
+      "best": 269,
+      "best_photo": "20260925_113754.jpg",
+      "second": 159,
+      "second_photo": "20260925_113758.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010535.png",
+      "best": 84,
+      "best_photo": "20260925_113754.jpg",
+      "second": 30,
+      "second_photo": "20260925_113831.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010542.png",
+      "best": 129,
+      "best_photo": "20260925_114026.jpg",
+      "second": 77,
+      "second_photo": "20260925_114115.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010547.png",
+      "best": 159,
+      "best_photo": "20260925_114026.jpg",
+      "second": 115,
+      "second_photo": "20260925_114115.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010555.png",
+      "best": 272,
+      "best_photo": "20260925_114026.jpg",
+      "second": 229,
+      "second_photo": "20260925_114111.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010559.png",
+      "best": 106,
+      "best_photo": "20260925_114026.jpg",
+      "second": 61,
+      "second_photo": "20260925_114021.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010602.png",
+      "best": 154,
+      "best_photo": "20260925_114026.jpg",
+      "second": 107,
+      "second_photo": "20260925_114021.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010610.png",
+      "best": 383,
+      "best_photo": "20260925_114109.jpg",
+      "second": 45,
+      "second_photo": "20260925_114106.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010618.png",
+      "best": 246,
+      "best_photo": "20260925_113958.jpg",
+      "second": 134,
+      "second_photo": "20260925_113802.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010626.png",
+      "best": 407,
+      "best_photo": "20260925_113958.jpg",
+      "second": 246,
+      "second_photo": "20260925_113957.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010643.png",
+      "best": 70,
+      "best_photo": "20260925_114217.jpg",
+      "second": 47,
+      "second_photo": "20260925_113925.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010659.png",
+      "best": 326,
+      "best_photo": "20260925_114111.jpg",
+      "second": 211,
+      "second_photo": "20260925_114026.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010711.png",
+      "best": 343,
+      "best_photo": "20260925_113828.jpg",
+      "second": 207,
+      "second_photo": "20260925_113831.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010722.png",
+      "best": 150,
+      "best_photo": "20260925_113828.jpg",
+      "second": 115,
+      "second_photo": "20260925_113933.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010731.png",
+      "best": 206,
+      "best_photo": "20260925_113828.jpg",
+      "second": 155,
+      "second_photo": "20260925_113931.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010748.png",
+      "best": 103,
+      "best_photo": "20260925_113828.jpg",
+      "second": 100,
+      "second_photo": "20260925_113834.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010751.png",
+      "best": 104,
+      "best_photo": "20260925_113828.jpg",
+      "second": 99,
+      "second_photo": "20260925_113834.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010804.png",
+      "best": 289,
+      "best_photo": "20260925_113831.jpg",
+      "second": 224,
+      "second_photo": "20260925_113758.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010809.png",
+      "best": 102,
+      "best_photo": "20260925_113831.jpg",
+      "second": 74,
+      "second_photo": "20260925_113758.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010817.png",
+      "best": 120,
+      "best_photo": "20260925_113758.jpg",
+      "second": 59,
+      "second_photo": "20260925_114000.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010826.png",
+      "best": 162,
+      "best_photo": "20260925_113758.jpg",
+      "second": 112,
+      "second_photo": "20260925_113950.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010835.png",
+      "best": 506,
+      "best_photo": "20260925_113758.jpg",
+      "second": 249,
+      "second_photo": "20260925_113802.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010844.png",
+      "best": 158,
+      "best_photo": "20260925_114017.jpg",
+      "second": 118,
+      "second_photo": "20260925_114020.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010849.png",
+      "best": 143,
+      "best_photo": "20260925_114017.jpg",
+      "second": 87,
+      "second_photo": "20260925_114020.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010854.png",
+      "best": 323,
+      "best_photo": "20260925_114017.jpg",
+      "second": 225,
+      "second_photo": "20260925_114021.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010859.png",
+      "best": 67,
+      "best_photo": "20260925_114017.jpg",
+      "second": 33,
+      "second_photo": "20260925_114030.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010915.png",
+      "best": 286,
+      "best_photo": "20260925_113953.jpg",
+      "second": 152,
+      "second_photo": "20260925_113802.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010925.png",
+      "best": 187,
+      "best_photo": "20260925_113822.jpg",
+      "second": 160,
+      "second_photo": "20260925_113819.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 010932.png",
+      "best": 329,
+      "best_photo": "20260925_113822.jpg",
+      "second": 157,
+      "second_photo": "20260925_113929.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011002.png",
+      "best": 155,
+      "best_photo": "20260925_113808.jpg",
+      "second": 104,
+      "second_photo": "20260925_113834.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011018.png",
+      "best": 123,
+      "best_photo": "20260925_113808.jpg",
+      "second": 114,
+      "second_photo": "20260925_113812.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011025.png",
+      "best": 123,
+      "best_photo": "20260925_113808.jpg",
+      "second": 97,
+      "second_photo": "20260925_113812.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011033.png",
+      "best": 183,
+      "best_photo": "20260925_113808.jpg",
+      "second": 129,
+      "second_photo": "20260925_113834.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011039.png",
+      "best": 102,
+      "best_photo": "20260925_113812.jpg",
+      "second": 97,
+      "second_photo": "20260925_113808.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011047.png",
+      "best": 112,
+      "best_photo": "20260925_113808.jpg",
+      "second": 59,
+      "second_photo": "20260925_113834.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011054.png",
+      "best": 584,
+      "best_photo": "20260925_114036.jpg",
+      "second": 25,
+      "second_photo": "20260925_114041.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011058.png",
+      "best": 571,
+      "best_photo": "20260925_114036.jpg",
+      "second": 62,
+      "second_photo": "20260925_113822.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011114.png",
+      "best": 282,
+      "best_photo": "20260925_114006.jpg",
+      "second": 177,
+      "second_photo": "20260925_113812.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011120.png",
+      "best": 416,
+      "best_photo": "20260925_114006.jpg",
+      "second": 202,
+      "second_photo": "20260925_113816.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011127.png",
+      "best": 175,
+      "best_photo": "20260925_114006.jpg",
+      "second": 79,
+      "second_photo": "20260925_113816.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011132.png",
+      "best": 203,
+      "best_photo": "20260925_114000.jpg",
+      "second": 60,
+      "second_photo": "20260925_113758.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011141.png",
+      "best": 194,
+      "best_photo": "20260925_113957.jpg",
+      "second": 105,
+      "second_photo": "20260925_113802.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011147.png",
+      "best": 290,
+      "best_photo": "20260925_114049.jpg",
+      "second": 40,
+      "second_photo": "20260925_114051.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011206.png",
+      "best": 436,
+      "best_photo": "20260925_113935.jpg",
+      "second": 203,
+      "second_photo": "20260925_113933.jpg"
+    },
+    {
+      "crop": "Screenshot 2026-09-26 011218.png",
+      "best": 342,
+      "best_photo": "20260925_113931.jpg",
+      "second": 186,
+      "second_photo": "20260925_113828.jpg"
+    }
+  ]
+}

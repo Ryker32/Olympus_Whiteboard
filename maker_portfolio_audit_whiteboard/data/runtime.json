@@ -1,0 +1,133 @@
+{
+  "env": {
+    "python": "3.13.5",
+    "opencv": "5.0.0",
+    "numpy": "2.1.3",
+    "machine": "Windows-11-10.0.26200-SP0",
+    "processor": "AMD64 Family 26 Model 36 Stepping 0, AuthenticAMD",
+    "repeats_after_warmup": 3
+  },
+  "runs": [
+    {
+      "file": "nomarker.jpeg",
+      "w": 3264,
+      "h": 2448,
+      "megapixels": 7.99,
+      "pre_cropped": false,
+      "n_quotes": 0,
+      "median_s": 5.434,
+      "min_s": 4.929,
+      "max_s": 5.606
+    },
+    {
+      "file": "exampletext.jpeg",
+      "w": 3264,
+      "h": 2448,
+      "megapixels": 7.99,
+      "pre_cropped": false,
+      "n_quotes": 1,
+      "median_s": 5.211,
+      "min_s": 5.113,
+      "max_s": 6.949
+    },
+    {
+      "file": "IMG_0877.jpeg",
+      "w": 3264,
+      "h": 2448,
+      "megapixels": 7.99,
+      "pre_cropped": false,
+      "n_quotes": 1,
+      "median_s": 7.021,
+      "min_s": 6.814,
+      "max_s": 7.04
+    },
+    {
+      "file": "IMG_0878.jpeg",
+      "w": 3264,
+      "h": 2448,
+      "megapixels": 7.99,
+      "pre_cropped": false,
+      "n_quotes": 1,
+      "median_s": 5.882,
+      "min_s": 5.684,
+      "max_s": 6.779
+    },
+    {
+      "file": "20260925_113754.jpg",
+      "w": 4032,
+      "h": 1816,
+      "megapixels": 7.32,
+      "pre_cropped": false,
+      "n_quotes": 2,
+      "median_s": 5.686,
+      "min_s": 5.542,
+      "max_s": 6.118
+    },
+    {
+      "file": "20260925_114003.jpg",
+      "w": 4032,
+      "h": 1816,
+      "megapixels": 7.32,
+      "pre_cropped": false,
+      "n_quotes": 2,
+      "median_s": 5.391,
+      "min_s": 5.295,
+      "max_s": 5.912
+    },
+    {
+      "file": "20260925_114224.jpg",
+      "w": 4032,
+      "h": 1816,
+      "megapixels": 7.32,
+      "pre_cropped": false,
+      "n_quotes": 5,
+      "median_s": 4.807,
+      "min_s": 4.806,
+      "max_s": 4.976
+    },
+    {
+      "file": "Screenshot 2026-09-26 010415.png",
+      "w": 2251,
+      "h": 966,
+      "megapixels": 2.17,
+      "pre_cropped": true,
+      "n_quotes": 1,
+      "median_s": 1.887,
+      "min_s": 1.75,
+      "max_s": 2.007
+    },
+    {
+      "file": "Screenshot 2026-09-26 010428.png",
+      "w": 1904,
+      "h": 759,
+      "megapixels": 1.45,
+      "pre_cropped": true,
+      "n_quotes": 1,
+      "median_s": 1.177,
+      "min_s": 1.162,
+      "max_s": 1.188
+    },
+    {
+      "file": "Screenshot 2026-09-26 010433.png",
+      "w": 1958,
+      "h": 686,
+      "megapixels": 1.34,
+      "pre_cropped": true,
+      "n_quotes": 1,
+      "median_s": 1.092,
+      "min_s": 1.07,
+      "max_s": 1.114
+    },
+    {
+      "file": "Screenshot 2026-09-26 010446.png",
+      "w": 2127,
+      "h": 1449,
+      "megapixels": 3.08,
+      "pre_cropped": true,
+      "n_quotes": 1,
+      "median_s": 2.691,
+      "min_s": 2.672,
+      "max_s": 2.903
+    }
+  ]
+}

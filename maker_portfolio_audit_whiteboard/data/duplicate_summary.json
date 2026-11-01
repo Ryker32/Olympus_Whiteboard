@@ -1,0 +1,50 @@
+[
+  {
+    "album": "stickers",
+    "n_stickers": 58,
+    "n_pairs": 1653,
+    "reference_pairs_present": 9,
+    "flagged": 8,
+    "true_positives": 8,
+    "precision": 1.0,
+    "recall": 0.8888888888888888,
+    "dup_corr_range": [
+      0.3390411138534546,
+      0.9999902844429016
+    ],
+    "dup_ink_max": 0.23687443050653406,
+    "max_nondup_corr": 0.315670907497406,
+    "nondup_above_corr_threshold": 0,
+    "min_ink_of_shape_alike_nondup": null,
+    "missed": [
+      [
+        "010559",
+        "010602"
+      ]
+    ]
+  },
+  {
+    "album": "stickers_hires",
+    "n_stickers": 56,
+    "n_pairs": 1540,
+    "reference_pairs_present": 9,
+    "flagged": 8,
+    "true_positives": 8,
+    "precision": 1.0,
+    "recall": 0.8888888888888888,
+    "dup_corr_range": [
+      0.2700205147266388,
+      0.9999837279319763
+    ],
+    "dup_ink_max": 0.2449807396295785,
+    "max_nondup_corr": 0.3292965292930603,
+    "nondup_above_corr_threshold": 0,
+    "min_ink_of_shape_alike_nondup": null,
+    "missed": [
+      [
+        "010643",
+        "010925"
+      ]
+    ]
+  }
+]

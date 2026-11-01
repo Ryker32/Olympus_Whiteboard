@@ -1,0 +1,150 @@
+{
+  "n_photos": 56,
+  "n_crops": 59,
+  "photo_size": [
+    [
+      4032,
+      1816
+    ]
+  ],
+  "hires_dirs": 56,
+  "crops_missing_from_hires": [
+    "Screenshot 2026-09-26 010403.png",
+    "Screenshot 2026-09-26 010822.png",
+    "Screenshot 2026-09-26 010956.png"
+  ],
+  "crops_with_zero_stickers_lowres": [
+    "Screenshot 2026-09-26 010822.png"
+  ],
+  "board_width_ratio_median": 2.243,
+  "board_width_ratio_min_max": [
+    2.192,
+    2.244
+  ],
+  "album_lowres": {
+    "n": 58,
+    "median_width_px": 557.5,
+    "median_width_in_at_300dpi": 1.86,
+    "flagged_duplicates": [
+      [
+        "sticker_04.png",
+        "sticker_03.png"
+      ],
+      [
+        "sticker_23.png",
+        "sticker_14.png"
+      ],
+      [
+        "sticker_28.png",
+        "sticker_27.png"
+      ],
+      [
+        "sticker_39.png",
+        "sticker_21.png"
+      ],
+      [
+        "sticker_49.png",
+        "sticker_48.png"
+      ],
+      [
+        "sticker_54.png",
+        "sticker_31.png"
+      ],
+      [
+        "sticker_57.png",
+        "sticker_24.png"
+      ],
+      [
+        "sticker_58.png",
+        "sticker_26.png"
+      ]
+    ],
+    "achromatic": 1
+  },
+  "album_hires": {
+    "n": 56,
+    "median_width_px": 1275.5,
+    "median_width_in_at_300dpi": 4.25,
+    "flagged_duplicates": [
+      [
+        "sticker_03.png",
+        "sticker_02.png"
+      ],
+      [
+        "sticker_15.png",
+        "sticker_14.png"
+      ],
+      [
+        "sticker_22.png",
+        "sticker_13.png"
+      ],
+      [
+        "sticker_27.png",
+        "sticker_26.png"
+      ],
+      [
+        "sticker_47.png",
+        "sticker_46.png"
+      ],
+      [
+        "sticker_52.png",
+        "sticker_30.png"
+      ],
+      [
+        "sticker_55.png",
+        "sticker_23.png"
+      ],
+      [
+        "sticker_56.png",
+        "sticker_25.png"
+      ]
+    ],
+    "achromatic": 1
+  },
+  "handover": {
+    "n_delivered": 47,
+    "n_byte_identical_to_pipeline": 33,
+    "modified_after_pipeline": [
+      "sticker_05.png",
+      "sticker_07.png",
+      "sticker_17.png",
+      "sticker_18.png",
+      "sticker_21.png",
+      "sticker_23.png",
+      "sticker_34.png",
+      "sticker_39.png",
+      "sticker_41.png",
+      "sticker_42.png",
+      "sticker_43.png",
+      "sticker_45.png",
+      "sticker_50.png",
+      "sticker_53.png"
+    ],
+    "alt_dupes": [
+      "sticker_03_dupe.png",
+      "sticker_13_dupe.png",
+      "sticker_14_dupe.png",
+      "sticker_20_dupe.png",
+      "sticker_25_dupe.png",
+      "sticker_26_dupe.png",
+      "sticker_30_dupe.png",
+      "sticker_47_dupe.png",
+      "sticker_55_dupe.png"
+    ],
+    "alt_originals": [
+      "sticker_05_original.png",
+      "sticker_07_original.png",
+      "sticker_17_original.png",
+      "sticker_18_original.png",
+      "sticker_21_original.png",
+      "sticker_34_original.png",
+      "sticker_39_original.png",
+      "sticker_41_original.png",
+      "sticker_42_original.png",
+      "sticker_43_original.png",
+      "sticker_45_original.png",
+      "sticker_50_unrotated_unboosted.png",
+      "sticker_53_original.png"
+    ]
+  }
+}

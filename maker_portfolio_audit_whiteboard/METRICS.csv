@@ -1,0 +1,47 @@
+metric,value,units,conditions,sample_size_and_variation,source_file_and_location,analysis_script,independently_reproducible,evidence_type,status
+Code size,2836 (src 1830; tests 896),lines,branch hires-stickers-and-glare-fixes @ 0a999a4,14 modules + 4 test files,wc -l src/wbx/*.py tests/*.py,none (shell),yes,measured,VERIFIED
+Commits,3,count,all branches,b4bde13 / 6be22e6 / 0a999a4,git log --all,none,yes,measured,VERIFIED
+Code versions with surviving artefacts,4,count,v1; v1.1; uncommitted 2026-09-26 version; v2,inferred from manifest param keys,out/cropped/*/manifest.json vs src/wbx/pipeline.py:26-50,DEVELOPMENT_TIMELINE.md,yes,inferred,INFERRED
+Merge-radius rules tried,3,count,fixed 30 px -> 5x stroke width -> 0.7x letter height,,6be22e6 message; git show 6be22e6:src/wbx/stickers.py:16; src/wbx/stickers.py:16,none,yes,measured,VERIFIED
+Test suite pass rate,35/37,tests,Anaconda Py 3.13.5 / OpenCV 5.0.0 / NumPy 2.1.3 / typer 0.9.0 (NOT the uv.lock env),1 run; 64.9 s,tests/test_synthetic.py,python -m pytest -p no:cacheprovider,yes,measured,VERIFIED
+Failing test (genuine),test_real_handwriting_is_one_sticker: radius 319 px vs expected 40-120,px,samples/exampletext.jpeg,1 photo,tests/test_synthetic.py:319; also .pytest_cache/v/cache/lastfailed,pytest,yes,measured,VERIFIED (stale test; contradicts README.md:238)
+Failing test (environment),test_cli_extract_and_sheet: click TypeError,—,typer 0.9.0 in audit env vs 0.27.2 locked,1,uv.lock,pytest,yes,measured,VERIFIED (not a code defect)
+Shoot size,56,photos,Samsung SM-G981U 4032x1816; 2026-09-25 11:37:54-11:42:24,single shoot,photos/*.jpg EXIF,s01_inventory.py,yes,measured,VERIFIED
+Hand-made crops,59,crops,RGBA screenshots 2026-09-26 01:04-01:12,,samples/cropped/,s01_inventory.py,yes,measured,VERIFIED (author unknown)
+Re-cut success rate,56/59 (94.9%),crops,SIFT 4000 feats @0.5 scale; FLANN; Lowe 0.75; RANSAC 5 px; >=25 inliers,1 reproduction; misses: 010403 (8 inl) 010822 (0) 010956 (7),README.md:150-152; src/wbx/recut.py,scripts/s04_recut_repro.py -> data/recut_results.csv,yes,measured,VERIFIED (reproduced)
+Re-cut linear resolution gain,2.24 median (2.19-2.24),x,matched crops only,n=56,README.md:151 (claims 2.2x),scripts/s04_recut_repro.py; s01_inventory.py (board width ratio 2.243),yes,measured,VERIFIED
+Re-cut best-photo inliers,67-584 (median 194),inliers,matched crops,n=56,data/recut_inlier_matrix.csv,scripts/s06_plot_recut.py,yes (RANSAC stochastic +-few),measured,VERIFIED
+Re-cut runner-up inliers,median 105; max 308; min best/second ratio 1.03,inliers,frames overlap,n=56,data/recut_separation.json,scripts/s06_plot_recut.py,yes,measured,VERIFIED — CONTRADICTS 'hundreds against single digits' (src/wbx/recut.py:98-99; README.md:154-156)
+Crop-photo pairs scoring <10 inliers,87% (2861/3304),fraction,,3304 pairs,data/recut_inlier_matrix.csv,ad hoc (see report §8),yes,measured,VERIFIED
+Re-cut wall time,276,s,59 crops x 56 photos; Windows 11 laptop; Py 3.13.5; OpenCV 5.0,1 run,data/recut_timing.txt,scripts/s04_recut_repro.py,hardware-dependent,measured (audit),VERIFIED
+Median sticker width low-res,557.5 px = 1.86 in @300dpi,px / in,album of screenshot crops,n=58,out/stickers/index.csv,s01_inventory.py,yes,measured,VERIFIED (README says 1.9)
+Median sticker width hi-res,1275.5 px = 4.25 in @300dpi,px / in,album of re-cut crops,n=56,out/stickers_hires/index.csv,s01_inventory.py,yes,measured,VERIFIED value; README says 4.1 -> minor CONTRADICTION
+Cleared (alpha=0) fraction of lasso crops,median 22.8% (IQR 20.2-28.1; range 13.3-79.8),%,,n=59; 69% within 20-40%,README.md:105-106; src/wbx/io.py:336-338,scripts/s07_failure_figures.py -> data/crop_cleared_fraction.json,yes,measured,VERIFIED
+Duplicate detector precision,8/8,pairs,shape corr>=0.45 AND ink dist<=0.35; reference = out/send/alt cull,low-res (1653 pairs) and hi-res (1540 pairs) runs identical,src/wbx/album.py:249-348,scripts/s02_duplicates.py,yes (labels by unknown person),measured,VERIFIED vs INFERRED labels
+Duplicate detector recall,8/9,pairs,as above; each run misses a different pair,n=9 reference pairs,data/duplicate_summary.json,scripts/s02_duplicates.py,yes,measured,VERIFIED vs INFERRED labels
+Duplicate pairs silhouette corr (flagged),0.578-1.000,Pearson r,low-res album,n=8,src/wbx/album.py:252-254 (claims 0.58-1.00),scripts/s02_duplicates.py,yes,measured,VERIFIED
+Max non-duplicate silhouette corr,0.316 (low-res) / 0.329 (hi-res),Pearson r,,1644 / 1531 pairs,album.py:253 claims 0.34,scripts/s02_duplicates.py,yes,measured,PARTLY CONTRADICTED (0.34 equals the 010559/010602 pair = a culled duplicate)
+Max duplicate ink distance,0.237 / 0.245,RGB L2 (0-1.73),,n=9,album.py:263 (claims within 0.24),scripts/s02_duplicates.py,yes,measured,VERIFIED
+Colour-veto activations on real data,0,pairs,no non-duplicate pair reached corr 0.45,1644+1531 pairs,album.py:263-265 claims a pair 0.80 apart,scripts/s02_duplicates.py,yes,measured,claim UNVERIFIED
+Delivered stickers,47,files,out/send,33 byte-identical to pipeline; 14 modified outside repo,out/send/; out/send/NOTES.txt,s01_inventory.py (md5),yes,measured,VERIFIED
+Stickers modified outside committed code,14/47 (29.8%),files,'film-removal pass'; rotation; coverage lift; replacement,,out/send vs out/stickers_hires md5,s01_inventory.py,yes,measured,VERIFIED (process unknown)
+Bare-board leak (synthetic),0.0 (bound <0.5%),% of bare px with alpha>0.05,1600x1000 synthetic; seed 0,1 board,tests/test_synthetic.py:64-72,scripts/s03_synthetic_metrics.py,yes,simulated,VERIFIED
+Stroke IoU per word (synthetic),0.950-0.974,IoU,6 words; coverage>0.1 truth,n=6,tests/test_synthetic.py:87-105 (bound >0.7),s03_synthetic_metrics.py,yes,simulated,VERIFIED
+Hue error per chromatic word (synthetic),0.45-2.41,degrees,5 chromatic words; core alpha>0.5 peak,n=5 (yellow worst 2.41),tests/test_synthetic.py:75-84 (bound 8),s03_synthetic_metrics.py,yes,simulated,VERIFIED
+Unmix hue error under wrong alpha,0 for alpha>=~0.53; up to 9.2 at 0.30,degrees,single yellow pixel; true alpha 0.7,29 alpha values,src/wbx/unmix.py:321-325,s03_synthetic_metrics.py -> fig_unmix_wrong_alpha,yes,simulated,VERIFIED — 'preserved exactly' (README.md:57) holds only in gamut
+Rectification corner error (synthetic),<=1.07 px for yaw 0-40 deg; NOT FOUND at 50 deg,px,1600x1000 board on wall; f=2200; D=2600,1 board per angle,tests/test_synthetic.py:233-239 (tests 25 deg only; bound 3 px),s03_synthetic_metrics.py,yes,simulated,VERIFIED
+Fat-stroke core fill single vs two-pass,56.6% -> 100%,% core px alpha>0.5,synthetic chisel word ~10 px median stroke,1 fixture,tests/test_synthetic.py:421-441,s03_synthetic_metrics.py -> fig_ablations_synthetic,yes,simulated,VERIFIED
+Dense red coverage recovered / true,68.1% -> 79.5%,%,single vs two-pass,1 fixture,tests/test_synthetic.py:638-647,s03_synthetic_metrics.py,yes,simulated,VERIFIED
+Chroma-mask effect (synthetic),0.6244 -> 0.6249,mean alpha,bg_ink_chroma 10 vs 0.08,1 fixture,src/wbx/pipeline.py:210,s03_synthetic_metrics.py,yes,simulated,VERIFIED null result
+Saturation-cue effect on yellow core (synthetic),100% retained with and without,%,sat_weight 0 vs 0.7,1 fixture,src/wbx/matte.py:290-292,s03_synthetic_metrics.py,yes,simulated,VERIFIED null result (claim not demonstrated)
+Deglare effect on glare spot (synthetic),0% matted with and without,%,deglare True vs False,1 fixture,tests/test_synthetic.py:623-635,s03_synthetic_metrics.py,yes,simulated,VERIFIED null result (test passes regardless)
+Red-quote background estimate shift,[0.78 0.55 0.54] -> [0.74 0.70 0.67],RGB,'a red quote' (unspecified),unknown,README.md:185-188,none,no,claimed,UNVERIFIED
+Needed merge slack in stroke widths,4.7-13.7,stroke widths,'across real photos',unknown,src/wbx/stickers.py:287-288,none,no,claimed,UNVERIFIED
+Auto merge radius on exampletext,319-320 (current) vs 60 (v1.1 claim),px,3264x2448 iPad,1 photo,out/exampletext/manifest.json; 6be22e6 message,pytest / s07,yes,measured,VERIFIED (v1.1 value no longer true)
+v1 'Hello' sticker count,5 (v1) -> 1 (current),stickers,exampletext.jpeg unrectified,1 photo,6be22e6 message,scripts/s07_failure_figures.py -> data/v1_vs_current_exampletext.json,yes,measured,VERIFIED (reproduced)
+v1 hallucinated quad,[[0 0] [3263 0] [3247 1383] [39 1779]],px,exampletext.jpeg,1 photo,6be22e6 message,s07_failure_figures.py,yes,measured,VERIFIED (reproduced)
+Pipeline runtime full photo,4.8-7.0 (median of 3 each),s,7.3-8.0 MP; Win 11 laptop; Py 3.13.5; OpenCV 5.0,n=7 photos,data/runtime.json,scripts/s05_runtime_and_stages.py,hardware-dependent,measured (audit),VERIFIED
+Pipeline runtime re-cut crop,1.1-2.7 (median of 3 each),s,1.3-3.1 MP,n=4 crops,data/runtime.json,s05_runtime_and_stages.py,hardware-dependent,measured (audit),VERIFIED
+Unrecovered glare-damaged stickers,2 (sticker_07 partial; sticker_10 signature lost) + 4 minor,stickers,delivered set,47,out/send/NOTES.txt,none (visual judgement),no,claimed,UNVERIFIED (qualitative)
+Adoption / users,none recorded,—,,,no evidence in repo,—,—,—,UNVERIFIED
+Cost / power / hardware,not applicable (software only; consumer phone + iPad),—,,,,—,—,—,N/A
